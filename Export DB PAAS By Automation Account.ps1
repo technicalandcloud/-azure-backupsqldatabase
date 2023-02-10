@@ -46,6 +46,8 @@
 	Human-readable informational and error messages produced during the job. Not intended to be consumed by another runbook.
 
 #>
+
+
 param(
     [parameter(Mandatory=$true)]
 	[String] $ResourceGroupName,
@@ -72,29 +74,16 @@ param(
 $ErrorActionPreference = 'stop'
 
 function Login() {
-	$connectionName = "AzureRunAsConnection"
-	try
-	{
-		$servicePrincipalConnection = Get-AutomationConnection -Name $connectionName         
 
-		Write-Verbose "Logging in to Azure..." -Verbose
+# Ensures you do not inherit an AzContext in your runbook
+Disable-AzContextAutosave -Scope Process
 
-		connect-AzAccount `
-			-ServicePrincipal `
-			-TenantId $servicePrincipalConnection.TenantId `
-			-ApplicationId $servicePrincipalConnection.ApplicationId `
-			-CertificateThumbprint $servicePrincipalConnection.CertificateThumbprint | Out-Null
-	}
-	catch {
-		if (!$servicePrincipalConnection)
-		{
-			$ErrorMessage = "Connection $connectionName not found."
-			throw $ErrorMessage
-		} else{
-			Write-Error -Message $_.Exception
-			throw $_.Exception
-		}
-	}
+# Connect to Azure with user-assigned managed identity
+$AzureContext = (Connect-AzAccount -Identity -AccountId "ClientID of User-Asigned Managed Identity").context
+
+# set and store context
+$AzureContext = Set-AzContext -SubscriptionName $AzureContext.Subscription -DefaultProfile $AzureContext
+
 }
 
 
@@ -164,4 +153,3 @@ Delete-Old-Backups `
 	-blobContainerName $BlobContainerName
 	
 Write-Verbose "Database backup script finished" -Verbose
-
